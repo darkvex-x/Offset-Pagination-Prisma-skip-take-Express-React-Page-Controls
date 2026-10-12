@@ -5,24 +5,36 @@ const router = Router();
 
 router.get("/", async (req, res, next) => {
   try {
-    const threads = await prisma.thread.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        author: {
-          select: {
-            name: true,
-            avatarUrl: true,
-          },
-        },
-        _count: {
-          select: {
-            comments: true,
-          },
-        },
-      },
-    });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = 10;
+    const skip = (page - 1) * pageSize;
+    const take = pageSize;
 
-    res.json({ threads });
+    const [threads, total] = await Promise.all([
+      prisma.thread.findMany({
+        skip,
+        take,
+        orderBy: { createdAt: "desc" },
+        include: {
+          author: {
+            select: {
+              name: true,
+              avatarUrl: true,
+            },
+          },
+          _count: {
+            select: {
+              comments: true,
+            },
+          },
+        },
+      }),
+      prisma.thread.count(),
+    ]);
+
+    const hasMore = total > page * pageSize;
+
+    res.json({ threads, total, hasMore });
   } catch (error) {
     next(error);
   }
